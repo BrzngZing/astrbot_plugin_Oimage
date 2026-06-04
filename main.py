@@ -13,7 +13,8 @@ class OImagePlugin(Star):
         self.generate = Generate(context, config)
         logger.info("OImage 插件加载成功")
 
-    @filter.command("Oimage")  # 只在 main.py 中注册一次
+    # 注册指令
+    @filter.command("Oimage")
     async def Oimage(self, event: AstrMessageEvent):
         """委托给 Generate 类的 draw 方法处理"""
         async for result in self.generate.draw(event):  # ← 调用 draw 方法

@@ -16,7 +16,6 @@ class Generate(Star):
         self.plugin_name = "oimage"
         self._client = None  # 客户端初始为 None
         self._init_data_dir()
-        # 注意：不在这里初始化 OpenAI 客户端
 
     def _init_data_dir(self):
         """初始化插件数据目录"""
@@ -28,18 +27,17 @@ class Generate(Star):
         logger.info(f"插件数据目录: {self.data_dir}")
 
     def _get_client(self):
-        """延迟初始化 OpenAI 客户端（只在需要时创建）"""
         # 如果已经初始化过，直接返回
         if self._client is not None:
             return self._client
 
-        # 每次调用时重新读取配置（支持热重载）
+        # 读取基础配置
         openai_config = self.config.get("openai_config", {})
         base_url = openai_config.get("base_url", "https://api.openai.com/v1")
         api_key = openai_config.get("api_key", "")
         timeout = openai_config.get("timeout", 180)
 
-        # 没有配置 API Key 时返回 None
+        # 检测是否配置api_key
         if not api_key:
             logger.warning("OpenAI API Key 未配置，请用户在 WebUI 中配置")
             return None
@@ -68,13 +66,12 @@ class Generate(Star):
 
         if client is None:
             yield event.plain_result(
-                "❌ OpenAI 客户端未初始化\n\n"
-                "请先在 WebUI 中配置 API Key：\n"
-                "1. 打开插件管理\n"
+                "❌ 插件未初始化\n\n"
+                "   请完整配置插件：\n"
+                "1. 打开插件→Astrbot插件\n"
                 "2. 找到 Oimage 插件\n"
-                "3. 点击「配置」\n"
-                "4. 填写 openai_config.api_key\n"
-                "5. 保存配置后，再次发送 /Oimage"
+                "3. 点击「⚙」\n"
+                "5. 保存配置"
             )
             return
 
@@ -86,10 +83,11 @@ class Generate(Star):
         yield event.plain_result(f"🎨 正在生成中：{prompt}...")
 
         try:
+            # 发起生图请求
             result = client.images.generate(
                 model=model, prompt=prompt, size=size, n=1, response_format="b64_json"
             )
-
+            # 图片处理（转码并保存）
             image_base64 = result.data[0].b64_json
             image_bytes = base64.b64decode(image_base64)
 
