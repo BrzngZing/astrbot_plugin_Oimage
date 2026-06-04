@@ -1,0 +1,35 @@
+{
+  "openai_config": {
+    "description": "基础配置",
+    "type": "object",
+    "hint": "OpenAi的接入网址和ApiKey",
+    "items": {
+      "base_url": {
+        "description": "base_url",
+        "type": "string",
+        "hint": "你的OpenAi接入网址"
+      },
+      "api_key": {
+        "description": "api_key",
+        "type": "string",
+        "hint": "你的Api_Key"
+      },
+      "model": {
+        "description": "模型名称",
+        "type": "string",
+        "hint": "需要调用的模型名称例如 gpt-image-2"
+      },
+      "size": {
+        "description": "默认尺寸",
+        "type": "string",
+        "hint": "你的Api_Key"
+      },
+      "timeout": {
+        "description": "超时时间(秒)",
+        "type": "int",
+        "default": 180,
+        "hint": "请求超时时间"
+      }
+    }
+  }
+}

@@ -1,14 +1,12 @@
-# astrbot-plugin-helloworld
+# 🎨 AstrBot OImage 插件
 
-AstrBot 插件模板 / A template plugin for AstrBot plugin feature
+基于 OpenAI API 的图像生成插件，为 AstrBot 提供 AI 图像生成能力。
 
-> [!NOTE]
-> This repo is just a template of [AstrBot](https://github.com/AstrBotDevs/AstrBot) Plugin.
-> 
-> [AstrBot](https://github.com/AstrBotDevs/AstrBot) is an agentic assistant for both personal and group conversations. It can be deployed across dozens of mainstream instant messaging platforms, including QQ, Telegram, Feishu, DingTalk, Slack, LINE, Discord, Matrix, etc. In addition, it provides a reliable and extensible conversational AI infrastructure for individuals, developers, and teams. Whether you need a personal AI companion, an intelligent customer support agent, an automation assistant, or an enterprise knowledge base, AstrBot enables you to quickly build AI applications directly within your existing messaging workflows.
+[![AstrBot](https://img.shields.io/badge/AstrBot-4.25.2+-blue)](https://github.com/Soulter/AstrBot)
+[![Python](https://img.shields.io/badge/Python-3.12+-green)](https://www.python.org/)
+[![OpenAI](https://img.shields.io/badge/OpenAI-API-orange)](https://openai.com/)
 
-# Supports
+---
 
-- [AstrBot Repo](https://github.com/AstrBotDevs/AstrBot)
-- [AstrBot Plugin Development Docs (Chinese)](https://docs.astrbot.app/dev/star/plugin-new.html)
-- [AstrBot Plugin Development Docs (English)](https://docs.astrbot.app/en/dev/star/plugin-new.html)
+- 极简配置，几乎没有其余功能，仅仅只能提供图片生成的指令。（其他功能还没来得及写）
+- 该插件仅作个人学习作品，因此并不建议使用。
