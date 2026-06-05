@@ -86,5 +86,23 @@
         "hint": "API 请求失败时的最大重试次数"
       }
     }
+  },
+  "storage": {
+    "description": "存储设置",
+    "type": "object",
+    "hint": "本地图片存储管理",
+    "items": {
+      "max_stored_images": {
+        "description": "最大本地存储图片数",
+        "type": "int",
+        "default": 30,
+        "slider": {
+          "min": 1,
+          "max": 500,
+          "step": 1
+        },
+        "hint": "本地缓存图片数量上限，超过自动清理最旧的图片"
+      }
+    }
   }
 }

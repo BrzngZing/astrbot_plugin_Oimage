@@ -46,6 +46,9 @@ class Generate:
         astrbot_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         self.data_dir = os.path.join(astrbot_dir, "data", "plugin_data", "oimage")
         os.makedirs(self.data_dir, exist_ok=True)
+        self.max_stored_images = int(
+            self.config.get("storage", {}).get("max_stored_images", 30)
+        )
 
     # ── 基础设施 ──
 
@@ -241,7 +244,27 @@ class Generate:
         path = os.path.join(self.data_dir, f"gen_{int(time.time() * 1000)}.png")
         with open(path, "wb") as f:
             f.write(data)
+        self._cleanup_old_images()
         return path
+
+    def _cleanup_old_images(self):
+        """保留最近 max_stored_images 张图片，删除超出部分（按mtime最旧优先）。"""
+        try:
+            files = [
+                os.path.join(self.data_dir, f)
+                for f in os.listdir(self.data_dir)
+                if f.startswith("gen_") and f.endswith(".png")
+            ]
+            if len(files) <= self.max_stored_images:
+                return
+            files.sort(key=os.path.getmtime)
+            for f in files[: len(files) - self.max_stored_images]:
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
+        except OSError:
+            pass
 
     # ── 多图并发生成 ──
 
@@ -264,7 +287,7 @@ class Generate:
         max_retry = int(self.config.get("generation", {}).get("max_retry_attempts", 3))
 
         async def _one():
-            for attempt in range(max_retry):
+            for attempt in range(max_retry + 1):
                 async with self.semaphore:
                     images, err = await self._call_api(prompt, size, refs)
                 if images:

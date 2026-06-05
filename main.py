@@ -26,7 +26,7 @@ from .generate import Generate
 
 
 @register(
-    "oimage", "Brzngzing", "AI图像生成插件（文生图/图生图/多图/LLM工具）", "1.0.0"
+    "oimage", "Brzngzing", "AI图像生成插件（文生图/图生图/多图/LLM工具）", "1.0.1"
 )
 class OImagePlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
