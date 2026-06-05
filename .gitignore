@@ -28,5 +28,8 @@ dist/
 .DS_Store
 Thumbs.db
 
+# Reasonix tools
+.reasonix/
+
 # Local config
 *.local.json
