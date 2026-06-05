@@ -1,34 +1,89 @@
 {
   "openai_config": {
-    "description": "基础配置",
+    "description": "OpenAI 兼容接口配置",
     "type": "object",
-    "hint": "OpenAi的接入网址和ApiKey",
+    "hint": "配置 OpenAI 或兼容接口的接入信息",
     "items": {
       "base_url": {
-        "description": "base_url",
+        "description": "API Base URL",
         "type": "string",
-        "hint": "支持OpenAi Api的接入网址"
+        "default": "https://api.openai.com/v1",
+        "hint": "OpenAI 兼容接口地址，例如 https://api.openai.com/v1"
       },
       "api_key": {
-        "description": "api_key",
+        "description": "API Key",
         "type": "string",
-        "hint": "你的Api_Key"
+        "hint": "你的 API Key"
       },
       "model": {
         "description": "模型名称",
         "type": "string",
-        "hint": "需要调用的模型名称例如 gpt-image-2"
+        "default": "gpt-image-2",
+        "hint": "模型名称，例如 gpt-image-2、gpt-image-1、dall-e-3"
+      },
+      "model_family": {
+        "description": "模型系列",
+        "type": "string",
+        "default": "auto",
+        "options": ["auto", "gpt-image", "dall-e"],
+        "hint": "auto 自动按模型名识别；gpt-image 使用 GPT Image 接口格式；dall-e 使用 DALL-E 接口格式"
+      },
+      "n": {
+        "description": "默认生成图片数量",
+        "type": "int",
+        "default": 1,
+        "slider": {
+          "min": 1,
+          "max": 10,
+          "step": 1
+        },
+        "hint": "单次生成图片数量（1-10），命令中可附加数字覆盖"
       },
       "size": {
-        "description": "默认尺寸",
+        "description": "默认图片尺寸",
         "type": "string",
-        "hint": "默认尺寸为1024x1024，GPT-Image-2支持（1024x1024, 1536x1024, 1024x1536, 2048x2048, 2048x1152, 3840x2160, 2160x3840）"
+        "default": "1024x1024",
+        "hint": "GPT-Image 支持：1024x1024, 1536x1024, 1024x1536, 2048x2048, 2048x1152, 3840x2160, 2160x3840。DALL-E 3 支持：1024x1024, 1792x1024, 1024x1792"
       },
       "timeout": {
         "description": "超时时间(秒)",
         "type": "int",
         "default": 180,
-        "hint": "请求超时时间(默认180s)，推荐120s-300s"
+        "slider": {
+          "min": 30,
+          "max": 600,
+          "step": 10
+        },
+        "hint": "请求超时时间(默认180s)"
+      }
+    }
+  },
+  "generation": {
+    "description": "生成设置",
+    "type": "object",
+    "hint": "并发、重试等生成控制参数",
+    "items": {
+      "max_concurrent_tasks": {
+        "description": "最大并发生图请求数",
+        "type": "int",
+        "default": 3,
+        "slider": {
+          "min": 1,
+          "max": 10,
+          "step": 1
+        },
+        "hint": "同时发起的 API 请求数上限"
+      },
+      "max_retry_attempts": {
+        "description": "最大重试次数",
+        "type": "int",
+        "default": 3,
+        "slider": {
+          "min": 0,
+          "max": 10,
+          "step": 1
+        },
+        "hint": "API 请求失败时的最大重试次数"
       }
     }
   }
