@@ -22,6 +22,7 @@
 | `openai_config.timeout` | 请求超时（秒） |
 | `generation.max_concurrent_tasks` | 最大并发数 |
 | `generation.max_retry_attempts` | 失败重试次数 |
+| `generation.max_cached_images` | 缓存图片数量上限，默认 30 |
 
 ## 用法
 
