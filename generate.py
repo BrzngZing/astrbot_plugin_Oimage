@@ -15,7 +15,6 @@ from astrbot.api.event import AstrMessageEvent
 
 LOG = "[OImage]"
 
-# 宽高比 → 像素尺寸映射
 GPT_SIZES = {
     "1:1": "1024x1024",
     "3:2": "1536x1024",
@@ -26,6 +25,7 @@ GPT_SIZES = {
     "3:4": "1024x1536",
     "9:16": "1024x1536",
 }
+
 DALLE_SIZES = {
     "1:1": "1024x1024",
     "3:2": "1792x1024",
@@ -39,6 +39,8 @@ DALLE_SIZES = {
 
 
 class Generate:
+    """图像生成核心类"""
+
     def __init__(self, context, config):
         self.config = config
         self._session = None
@@ -46,14 +48,13 @@ class Generate:
         astrbot_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         self.data_dir = os.path.join(astrbot_dir, "data", "plugin_data", "oimage")
         os.makedirs(self.data_dir, exist_ok=True)
-        self.max_stored_images = int(
-            self.config.get("storage", {}).get("max_stored_images", 30)
+        self.max_cached_images = int(
+            self.config.get("generation", {}).get("max_cached_images", 30)
         )
 
-    # ── 基础设施 ──
+    # ── 配置读取 ──
 
     def cfg(self, key, default=""):
-        """读取 openai_config 配置项。"""
         return self.config.get("openai_config", {}).get(key, default)
 
     @property
@@ -71,12 +72,10 @@ class Generate:
 
     @property
     def _is_gpt(self) -> bool:
-        """当前模型是否为 GPT-Image 系列。"""
         m = self.cfg("model", "").lower()
         return "gpt-image" in m or self.cfg("model_family", "") == "gpt-image"
 
     def _resolve_size(self, size: str | None) -> str:
-        """用户可能传宽高比（1:1）或像素尺寸（1024x1024），统一为像素尺寸。"""
         if size and ":" in size:
             return (GPT_SIZES if self._is_gpt else DALLE_SIZES).get(size, size)
         return size or self.cfg("size", "1024x1024")
@@ -99,10 +98,10 @@ class Generate:
                 break
         return " ".join(tokens[end:]).strip(), count, size
 
-    # ── 参考图下载 ──
+    # ── 图片下载 ──
 
     async def download_image(self, url: str):
-        """下载一张图片，返回 (bytes, mime)，不支持的格式转 JPEG。"""
+        """下载图片，返回 (bytes, mime)，大于 10MB 返回 None。"""
         if not url:
             return None
         try:
@@ -131,6 +130,7 @@ class Generate:
         return None
 
     async def _ensure_jpeg(self, data: bytes, mime: str):
+        """非 JPEG/PNG/WebP 格式转 JPEG。"""
         if mime in ("image/png", "image/jpeg", "image/webp"):
             return data, mime
         try:
@@ -139,8 +139,7 @@ class Generate:
                 bg = Image.new("RGB", img.size, (255, 255, 255))
                 if img.mode == "P":
                     img = img.convert("RGBA")
-                alpha = img.split()[3]
-                bg.paste(img, mask=alpha)
+                bg.paste(img, mask=img.split()[3])
                 img = bg
             out = BytesIO()
             img.save(out, format="JPEG", quality=95)
@@ -167,7 +166,7 @@ class Generate:
     # ── API 调用 ──
 
     async def _post(self, url, headers, **kwargs):
-        """通用 POST + 响应提取。"""
+        """通用 POST 请求。"""
         try:
             async with self.session.post(
                 url,
@@ -183,7 +182,7 @@ class Generate:
             return None, str(e)
 
     async def _call_api(self, prompt, size, refs):
-        """单次生成调用（有参考图走 edits，否则走 generations）。"""
+        """调用 OpenAI 图像 API。有参考图走 /images/edits，否则走 /images/generations。"""
         base = self.cfg("base_url", "https://api.openai.com/v1").rstrip("/")
         key = self.cfg("api_key")
         model = self.cfg("model", "gpt-image-2")
@@ -218,7 +217,7 @@ class Generate:
         )
 
     async def _extract(self, resp):
-        """HTTP 响应 → (图片列表, 错误信息)。"""
+        """解析 API 响应为 (图片列表, 错误信息)。"""
         if resp.status != 200:
             text = await resp.text()
             logger.error(f"{LOG} API {resp.status}: {text[:200]}")
@@ -241,6 +240,7 @@ class Generate:
         return (images, None) if images else (None, "未找到有效图片数据")
 
     def save_image(self, data: bytes) -> str:
+        """将图片字节数据保存到本地，超出上限时删除最旧的图片。"""
         path = os.path.join(self.data_dir, f"gen_{int(time.time() * 1000)}.png")
         with open(path, "wb") as f:
             f.write(data)
@@ -248,46 +248,36 @@ class Generate:
         return path
 
     def _cleanup_old_images(self):
-        """保留最近 max_stored_images 张图片，删除超出部分（按mtime最旧优先）。"""
+        """删除超出数量限制的最旧图片文件。"""
         try:
             files = [
                 os.path.join(self.data_dir, f)
                 for f in os.listdir(self.data_dir)
                 if f.startswith("gen_") and f.endswith(".png")
             ]
-            if len(files) <= self.max_stored_images:
+            if len(files) <= self.max_cached_images:
                 return
             files.sort(key=os.path.getmtime)
-            for f in files[: len(files) - self.max_stored_images]:
-                try:
-                    os.remove(f)
-                except OSError:
-                    pass
-        except OSError:
-            pass
+            for f in files[: len(files) - self.max_cached_images]:
+                os.remove(f)
+                logger.debug(f"{LOG} 清理旧图片: {os.path.basename(f)}")
+        except Exception as e:
+            logger.warning(f"{LOG} 清理缓存图片失败: {e}")
 
-    # ── 多图并发生成 ──
+    # ── 批量生成（指令用） ──
 
     NON_RETRYABLE = (
-        "invalid",
-        "unauthorized",
-        "forbidden",
-        "not found",
-        "unsupported",
-        "bad request",
-        "permission",
-        "safety",
-        "参数",
-        "无效",
-        "不支持",
+        "invalid", "unauthorized", "forbidden", "not found",
+        "unsupported", "bad request", "permission", "safety",
+        "参数", "无效", "不支持",
     )
 
     async def generate_batch(self, prompt, n, size, refs):
-        """并发生成 n 张图，每张独立重试。"""
+        """并发生成 n 张图，每张独立重试（供 /Oimage 指令使用）。"""
         max_retry = int(self.config.get("generation", {}).get("max_retry_attempts", 3))
 
         async def _one():
-            for attempt in range(max_retry + 1):
+            for attempt in range(max_retry):
                 async with self.semaphore:
                     images, err = await self._call_api(prompt, size, refs)
                 if images:
@@ -304,6 +294,7 @@ class Generate:
     # ── 公开接口 ──
 
     async def draw(self, event: AstrMessageEvent):
+        """/Oimage 指令处理"""
         text = event.message_str.replace("/Oimage", "").strip()
         if not text:
             yield event.plain_result(
@@ -341,25 +332,32 @@ class Generate:
             f"✅ {len(paths)}张 | {prompt} | {self.cfg('model')} | {elapsed:.1f}s"
         )
 
-    async def draw_tool(self, prompt, n=1, size=None, ref_image_urls=None):
+    async def draw_tool(self, prompt, n=1, size=None, ref_image_urls=None, ref_images=None):
+        """LLM Tool 调用：不重试，出错直接返回错误信息。"""
         if not self.cfg("api_key"):
             return "❌ API Key 未配置"
 
         size = self._resolve_size(size or self.cfg("size", "1024x1024"))
-        refs = []
+        refs = list(ref_images or [])
         if ref_image_urls and self._is_gpt:
             for url in ref_image_urls:
                 if img := await self.download_image(url):
-                    refs.append(img)
+                    if img not in refs:
+                        refs.append(img)
 
-        paths = await self.generate_batch(
-            prompt, n, size, refs if self._is_gpt else None
-        )
-        if not paths:
-            return "❌ 生成失败"
+        async with self.semaphore:
+            images_data, err = await self._call_api(prompt, size, refs if self._is_gpt else None)
+
+        if err:
+            return f"❌ 生成失败：{err}"
+        if not images_data:
+            return "❌ 生成失败：API 未返回图片数据"
+
+        paths = [self.save_image(data) for data in images_data]
         return "\n".join([f"已生成 {len(paths)} 张图片", *paths])
 
     async def close(self):
+        """释放 aiohttp 会话"""
         if self._session and not self._session.closed:
             await self._session.close()
             self._session = None

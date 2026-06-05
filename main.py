@@ -1,12 +1,4 @@
-"""
-Oimage 图像生成插件主模块
-
-支持四大核心能力：
-1. 文生图 — 根据提示词生成图片
-2. 图生图 — 携带参考图片生成
-3. 多图生成 — 一次生成多张
-4. LLM Tool 调用 — 供 AI 对话调用
-"""
+"""Oimage 图像生成插件主模块"""
 
 from __future__ import annotations
 
@@ -26,44 +18,54 @@ from .generate import Generate
 
 
 @register(
-    "oimage", "Brzngzing", "AI图像生成插件（文生图/图生图/多图/LLM工具）", "1.0.1"
+    "oimage", "Brzngzing", "AI图像生成插件（文生图/图生图/多图/LLM工具）", "1.1.0"
 )
 class OImagePlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.generate = Generate(context, config)
-        logger.info("OImage v0.3.0 初始化完成")
+        logger.info("OImage v1.1.0 初始化完成")
 
     async def initialize(self):
-        """插件加载时注册 LLM Tool"""
+        """注册 LLM Tool"""
         self.context.add_llm_tools(OimageTool(plugin=self))
-        logger.info("OImage v0.3.0 插件加载成功，LLM Tool 已注册")
+        logger.info("OImage v1.1.0 插件加载成功")
 
     async def terminate(self):
-        """插件卸载时释放资源"""
+        """释放资源"""
         await self.generate.close()
-        logger.info("OImage v0.3.0 资源已释放")
+        logger.info("OImage v1.1.0 资源已释放")
 
     @filter.command("Oimage")
     async def Oimage(self, event: AstrMessageEvent):
-        """/Oimage 指令 — 支持带参考图、多图生成"""
+        """/Oimage 指令入口"""
         async for result in self.generate.draw(event):
             yield result
 
 
 @dataclass
 class OimageTool(FunctionTool[AstrAgentContext]):
-    """LLM 图片生成工具 — 机器人通过对话调用生图"""
+    """LLM 调用的生图工具"""
 
     name: str = "oimage_tool"
-    description: str = "根据提示词生成图片。支持指定数量、尺寸。"
+    description: str = (
+        '根据提示词生成图片。支持图生图、指定数量、尺寸。'
+        '重要：只使用用户的需求文本作为关键词，不要自行添加任何场景描述、画面细节或艺术风格设定。'
+        '不要猜测、扩展或美化用户提示词，仅对用户的提示词进行整理。'
+        '如果生图成功，请把图片返回给用户。'
+    )
     parameters: dict = Field(
         default_factory=lambda: {
             "type": "object",
             "properties": {
                 "keywords": {
                     "type": "string",
-                    "description": "图片生成提示词，详细描述想要的内容",
+                    "description": "用户原始需求文本。不要添加自己的场景描述、画面细节或艺术风格设定，只传递用户本来说的话。",
+                },
+                "reference_images": {
+                    "type": "array",
+                    "description": "参考图 URL。直接传入即可，不要对图片内容做任何描述或猜测。",
+                    "items": {"type": "string"},
                 },
                 "n": {
                     "type": "integer",
@@ -103,5 +105,22 @@ class OimageTool(FunctionTool[AstrAgentContext]):
             raw_size.strip() if raw_size and raw_size.strip() else None
         )
 
-        result = await plugin.generate.draw_tool(keywords, n=n, size=image_size)
+        ref_images: list[tuple[bytes, str]] = []
+        try:
+            event = context.context.event
+            if event:
+                ref_images = await plugin.generate.collect_references(event)
+        except Exception:
+            pass
+
+        refs = kwargs.get("reference_images")
+        if refs and isinstance(refs, list):
+            for url in refs:
+                if url and (img := await plugin.generate.download_image(str(url))):
+                    if img not in ref_images:
+                        ref_images.append(img)
+
+        result = await plugin.generate.draw_tool(
+            keywords, n=n, size=image_size, ref_images=ref_images,
+        )
         return result

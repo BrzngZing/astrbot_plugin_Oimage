@@ -1,6 +1,6 @@
 name: astrbot_plugin_oimage
 display_name: Oimage
 desc: 通用图像生成工具，支持文生图/图生图/多图/LLM 工具调用。
-version: v1.0.1
+version: v1.1.0
 author: Brzngzing
 repo: https://github.com/BrzngZing/astrbot_plugin_Oimage
